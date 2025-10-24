@@ -13,10 +13,19 @@ class Settings(BaseSettings):
     APP_NAME: str = "Elasticidad API"
     APP_VERSION: str = "0.1.0"
     DEBUG: bool = False
-    LOG_LEVEL: str = "INFO"
+    LOG_LEVEL: str = "DEBUG"
 
     # Base de datos
     DATABASE_URL: Optional[str] = None
+
+    # BigQuery Configuration
+    GOOGLE_CLOUD_PROJECT: Optional[str] = None
+    GOOGLE_APPLICATION_CREDENTIALS: Optional[str] = (
+        "onus-dev-proy-retail-elastici-83ed79bcd281.json"
+    )
+    BIGQUERY_DATASET_DEV: str = "staging"
+    BIGQUERY_DATASET_PRD: str = "production"
+    BIGQUERY_LOCATION: str = "us-central1"
 
     # Configuración de entornos
     DEV_ENABLED: bool = True
@@ -24,10 +33,6 @@ class Settings(BaseSettings):
 
     # Rutas
     SCRIPTS_PATH: str = "./app/scripts"
-
-    # Cloud Run / GCP
-    GOOGLE_CLOUD_PROJECT: Optional[str] = None
-    GOOGLE_APPLICATION_CREDENTIALS: Optional[str] = None
 
     # API Keys
     API_KEY: Optional[str] = None

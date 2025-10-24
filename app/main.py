@@ -15,6 +15,7 @@ from .models.flow import (
     FlowValidationResponse,
 )
 from .services.flow_executor import FlowExecutor
+from .services.bigquery_service import bigquery_service
 
 # Configurar logging
 logger.remove()
@@ -23,6 +24,9 @@ logger.add(
     format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}",
     level=settings.LOG_LEVEL,
 )
+
+# Mensaje de prueba para verificar nivel DEBUG
+logger.info(f"Aplicación iniciando - DEBUG habilitado: {settings.LOG_LEVEL == 'DEBUG'}")
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -77,6 +81,48 @@ async def execute_dev_flow(flow_request: FlowRequest):
     if not settings.DEV_ENABLED:
         raise HTTPException(status_code=503, detail="El entorno DEV no está habilitado")
 
+    # flow_request = {
+    #    "flow": [
+    #        {"step": 1, "type": "script", "name": "unificacion_precios_variacion.py"},
+    #        {
+    #            "step": 2,
+    #            "type": "procedure",
+    #            "name": "elasticidad_historica_kgv_semanal_v1",
+    #        },
+    #        {
+    #            "step": 3,
+    #            "type": "procedure",
+    #            "name": "test_imputacion_elasticidad_semanal_no_suavizado",
+    #        },
+    #        {
+    #            "step": 4,
+    #            "type": "procedure",
+    #            "name": "elasticidad_tasa_de_ocupacion_semanal",
+    #        },
+    #        {"step": 5, "type": "procedure", "name": "elasticidad_tipo_cambio_semanal"},
+    #        {"step": 6, "type": "procedure", "name": "elasticidad_inpc_semanal"},
+    #        {"step": 7, "type": "procedure", "name": "elasticidad_pib_semanal"},
+    #        {
+    #            "step": 8,
+    #            "type": "procedure",
+    #            "name": "test_imputacion_elasticidad_externa_semanal",
+    #        },
+    #        {
+    #            "step": 9,
+    #            "type": "procedure",
+    #            "name": "elasticidades_externas_por_grupo_semanal_v1",
+    #        },
+    #        {"step": 10, "type": "procedure", "name": "prep_tabla_dashboard_semanal"},
+    #        {"step": 11, "type": "script", "name": "optimizacion_v3.py"},
+    #        {"step": 12, "type": "procedure", "name": "prep_tabla_dashboard_semanal"},
+    #        {
+    #            "step": 13,
+    #            "type": "procedure",
+    #            "name": "prep_tabla_dashboard_optimizacion_semanal",
+    #        },
+    #    ]
+    # }
+
     logger.info(f"Ejecutando flujo DEV con {len(flow_request.flow)} pasos")
 
     try:
@@ -125,7 +171,7 @@ async def validate_flow_syntax(flow_request: FlowValidationRequest):
         FlowValidationResponse: Resultado de la validación
     """
     try:
-        validation_result = flow_executor.validate_flow(flow_request.flow)
+        validation_result = await flow_executor.validate_flow(flow_request.flow)
         return FlowValidationResponse(
             valid=validation_result["valid"],
             errors=validation_result.get("errors", []),
@@ -134,6 +180,40 @@ async def validate_flow_syntax(flow_request: FlowValidationRequest):
     except Exception as e:
         logger.error(f"Error validando flujo: {str(e)}")
         raise HTTPException(status_code=400, detail=f"Error en validación: {str(e)}")
+
+
+@app.get("/procedures/{environment}")
+async def list_procedures(environment: str):
+    """
+    Lista los procedimientos disponibles en BigQuery para un entorno
+
+    Args:
+        environment: Entorno (dev o prd)
+
+    Returns:
+        dict: Lista de procedimientos disponibles
+    """
+    if environment not in ["dev", "prd"]:
+        raise HTTPException(status_code=400, detail="El entorno debe ser 'dev' o 'prd'")
+
+    if environment == "dev" and not settings.DEV_ENABLED:
+        raise HTTPException(status_code=503, detail="El entorno DEV no está habilitado")
+
+    if environment == "prd" and not settings.PRD_ENABLED:
+        raise HTTPException(status_code=503, detail="El entorno PRD no está habilitado")
+
+    try:
+        procedures = await bigquery_service.list_procedures(environment)
+        return {
+            "environment": environment,
+            "total_procedures": len(procedures),
+            "procedures": procedures,
+        }
+    except Exception as e:
+        logger.error(f"Error listando procedimientos en {environment}: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error accediendo a BigQuery: {str(e)}"
+        )
 
 
 if __name__ == "__main__":
