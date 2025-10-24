@@ -3,16 +3,17 @@ Ejecutor de flujos - Maneja la ejecución de scripts y procedimientos
 """
 
 import asyncio
-import subprocess
+import os
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 
 from loguru import logger
 
 from ..config import settings
 from ..models.flow import FlowStep, FlowResponse, StepResult, StepType
+from .bigquery_service import bigquery_service
 
 
 class FlowExecutor:
@@ -131,7 +132,6 @@ class FlowExecutor:
 
         except Exception as e:
             logger.error(f"Error ejecutando paso {step.step}: {str(e)}")
-            step_result.error = str(e)
             step_result.status = "error"
 
         end_time = datetime.now()
@@ -174,7 +174,7 @@ class FlowExecutor:
             *cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
-            env={**dict(asyncio.subprocess.os.environ), "ENVIRONMENT": environment},
+            env={**dict(os.environ), "ENVIRONMENT": environment},
         )
 
         try:
@@ -195,7 +195,7 @@ class FlowExecutor:
 
     async def _execute_procedure(self, step: FlowStep, environment: str) -> str:
         """
-        Ejecuta un stored procedure
+        Ejecuta un stored procedure en BigQuery
 
         Args:
             step: Paso con información del procedimiento
@@ -204,18 +204,44 @@ class FlowExecutor:
         Returns:
             str: Resultado del procedimiento
         """
-        # Por ahora, simulamos la ejecución de un stored procedure
-        # En una implementación real, aquí harías la conexión a la base de datos
+        logger.info(
+            f"Ejecutando stored procedure en BigQuery: {step.name} en {environment}"
+        )
 
-        logger.info(f"Ejecutando stored procedure: {step.name} en {environment}")
+        try:
+            # Ejecutar procedimiento usando el servicio de BigQuery
+            result = await bigquery_service.execute_procedure(
+                procedure_name=step.name,
+                environment=environment,
+                parameters=step.parameters,
+            )
 
-        # Simular tiempo de ejecución
-        await asyncio.sleep(1)
+            # Formatear resultado para logging
+            output_lines = [
+                f"Procedimiento ejecutado exitosamente",
+                f"Job ID: {result['job_id']}",
+                f"Dataset: {result['dataset']}",
+                f"Estado: {result['state']}",
+                f"Filas afectadas: {result.get('rows_affected', 'N/A')}",
+                f"Tiempo de ejecución: {result.get('execution_time_ms', 'N/A')} ms",
+            ]
 
-        # Simular resultado exitoso
-        return f"Stored procedure {step.name} ejecutado exitosamente en {environment}"
+            if result.get("total_rows", 0) > 0:
+                output_lines.append(f"Filas devueltas: {result['total_rows']}")
+                # Agregar primeras filas como muestra (máximo 5)
+                for i, row in enumerate(result.get("results", [])[:5]):
+                    output_lines.append(f"  Fila {i + 1}: {row}")
+                if result["total_rows"] > 5:
+                    output_lines.append(f"  ... y {result['total_rows'] - 5} filas más")
 
-    def validate_flow(self, flow_steps: List[dict]) -> Dict[str, Any]:
+            return "\n".join(output_lines)
+
+        except Exception as e:
+            error_msg = f"Error ejecutando procedimiento {step.name}: {str(e)}"
+            logger.error(error_msg)
+            raise RuntimeError(error_msg)
+
+    async def validate_flow(self, flow_steps: List[dict]) -> Dict[str, Any]:
         """
         Valida la sintaxis de un flujo sin ejecutarlo
 
@@ -239,13 +265,27 @@ class FlowExecutor:
                     errors.append(f"Paso {step_dict.get('step', '?')}: {str(e)}")
 
             if not errors:
-                # Validar que los scripts existen (solo advertencias)
+                # Validar que los scripts y procedimientos existen
                 for step in validated_steps:
                     if step.type == StepType.SCRIPT:
                         script_path = self.scripts_path / step.name
                         if not script_path.exists():
                             warnings.append(
                                 f"Script {step.name} no encontrado en {script_path}"
+                            )
+                    elif step.type == StepType.PROCEDURE:
+                        # Validar procedimiento en BigQuery (para dev por defecto)
+                        try:
+                            exists = await bigquery_service.validate_procedure_exists(
+                                step.name, "dev"
+                            )
+                            if not exists:
+                                warnings.append(
+                                    f"Procedimiento {step.name} no encontrado en BigQuery"
+                                )
+                        except Exception as e:
+                            warnings.append(
+                                f"No se pudo validar procedimiento {step.name}: {str(e)}"
                             )
 
         except Exception as e:
