@@ -10,6 +10,7 @@ PROJECT_ID="onus-prd-proy-retail-elastici"
 REGION="us-central1"
 SERVICE_NAME="elasticidad-api"
 ENV_FILE=".env"
+SHORT_SHA=$(git rev-parse --short HEAD)
 
 # Colores para output
 RED='\033[0;31m'
@@ -142,6 +143,7 @@ log "Desplegando usando Cloud Build..."
 # Actualizar cloudbuild.yaml con parámetros dinámicos
 sed -i.bak "s/elasticidad-api/$SERVICE_NAME/g" cloudbuild.yaml
 sed -i.bak "s/us-central1/$REGION/g" cloudbuild.yaml
+sed -i.bak "s/SHORT_SHA_PLACEHOLDER/$SHORT_SHA/g" cloudbuild.yaml
 
 # Ejecutar Cloud Build
 gcloud builds submit --config cloudbuild.yaml .

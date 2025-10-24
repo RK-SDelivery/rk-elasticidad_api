@@ -1,5 +1,5 @@
 substitutions:
-  _IMAGE_TAG: '${SHORT_SHA}'
+  _IMAGE_TAG: 'SHORT_SHA_PLACEHOLDER'
   _SERVICE_NAME: 'elasticidad-api'
   _REGION: 'us-central1'
 
