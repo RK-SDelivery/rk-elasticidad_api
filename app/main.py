@@ -8,7 +8,12 @@ from loguru import logger
 import sys
 
 from .config import settings
-from .models.flow import FlowRequest, FlowResponse
+from .models.flow import (
+    FlowRequest,
+    FlowResponse,
+    FlowValidationRequest,
+    FlowValidationResponse,
+)
 from .services.flow_executor import FlowExecutor
 
 # Configurar logging
@@ -108,24 +113,24 @@ async def execute_prd_flow(flow_request: FlowRequest):
         raise HTTPException(status_code=500, detail=f"Error en ejecución: {str(e)}")
 
 
-@app.get("/flows/validate")
-async def validate_flow_syntax(flow: list):
+@app.post("/flows/validate", response_model=FlowValidationResponse)
+async def validate_flow_syntax(flow_request: FlowValidationRequest):
     """
     Valida la sintaxis de un flujo sin ejecutarlo
 
     Args:
-        flow: Lista de pasos del flujo
+        flow_request: Solicitud con la lista de pasos del flujo
 
     Returns:
-        dict: Resultado de la validación
+        FlowValidationResponse: Resultado de la validación
     """
     try:
-        validation_result = flow_executor.validate_flow(flow)
-        return {
-            "valid": validation_result["valid"],
-            "errors": validation_result.get("errors", []),
-            "warnings": validation_result.get("warnings", []),
-        }
+        validation_result = flow_executor.validate_flow(flow_request.flow)
+        return FlowValidationResponse(
+            valid=validation_result["valid"],
+            errors=validation_result.get("errors", []),
+            warnings=validation_result.get("warnings", []),
+        )
     except Exception as e:
         logger.error(f"Error validando flujo: {str(e)}")
         raise HTTPException(status_code=400, detail=f"Error en validación: {str(e)}")

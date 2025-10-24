@@ -74,6 +74,51 @@ class FlowRequest(BaseModel):
 
         return v
 
+    class Config:
+        """Configuración adicional"""
+
+        json_schema_extra = {
+            "examples": [
+                {
+                    "flow": [
+                        {"step": 1, "type": "script", "name": "suavizado.py"},
+                        {"step": 2, "type": "procedure", "name": "optimizacion"},
+                    ],
+                    "metadata": {"requested_by": "user123", "priority": "high"},
+                }
+            ]
+        }
+
+
+class FlowValidationRequest(BaseModel):
+    """Solicitud de validación del flujo"""
+
+    flow: List[dict] = Field(
+        ..., description="Lista de pasos del flujo como diccionarios"
+    )
+
+    class Config:
+        """Configuración adicional"""
+
+        json_schema_extra = {
+            "examples": [
+                {
+                    "flow": [
+                        {"step": 1, "type": "script", "name": "suavizado.py"},
+                        {"step": 2, "type": "procedure", "name": "optimizacion"},
+                    ]
+                }
+            ]
+        }
+
+
+class FlowValidationResponse(BaseModel):
+    """Respuesta de la validación del flujo"""
+
+    valid: bool = Field(..., description="Indica si el flujo es válido")
+    errors: List[str] = Field(..., description="Lista de errores encontrados")
+    warnings: List[str] = Field(..., description="Lista de advertencias encontradas")
+
 
 class StepResult(BaseModel):
     """Resultado de la ejecución de un paso"""
