@@ -6,7 +6,7 @@
 set -e
 
 # Configuración por defecto
-PROJECT_ID=""
+PROJECT_ID="onus-prd-proy-retail-elastici"
 REGION="us-central1"
 SERVICE_NAME="elasticidad-api"
 ENV_FILE=".env"

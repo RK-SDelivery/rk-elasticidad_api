@@ -1,11 +1,16 @@
+substitutions:
+  _IMAGE_TAG: '${SHORT_SHA}'
+  _SERVICE_NAME: 'elasticidad-api'
+  _REGION: 'us-central1'
+
 steps:
   # Construir la imagen de Docker
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'gcr.io/$PROJECT_ID/elasticidad-api:$COMMIT_SHA', '.']
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/${_SERVICE_NAME}:${_IMAGE_TAG}', '.']
   
   # Subir la imagen al Container Registry
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'gcr.io/$PROJECT_ID/elasticidad-api:$COMMIT_SHA']
+    args: ['push', 'gcr.io/$PROJECT_ID/${_SERVICE_NAME}:${_IMAGE_TAG}']
   
   # Desplegar en Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -13,11 +18,11 @@ steps:
     args:
       - 'run'
       - 'deploy'
-      - 'elasticidad-api'
+      - '${_SERVICE_NAME}'
       - '--image'
-      - 'gcr.io/$PROJECT_ID/elasticidad-api:$COMMIT_SHA'
+      - 'gcr.io/$PROJECT_ID/${_SERVICE_NAME}:${_IMAGE_TAG}'
       - '--region'
-      - 'us-central1'
+      - '${_REGION}'
       - '--platform'
       - 'managed'
       - '--allow-unauthenticated'
@@ -33,7 +38,7 @@ steps:
       - 'DEBUG=false,LOG_LEVEL=INFO'
 
 images:
-  - 'gcr.io/$PROJECT_ID/elasticidad-api:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/${_SERVICE_NAME}:${_IMAGE_TAG}'
 
 options:
   logging: CLOUD_LOGGING_ONLY
